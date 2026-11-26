@@ -32,6 +32,11 @@ webrtc start`` 拿共享内存名，断开时跑 ``... webrtc stop``。``adb emu
 
 截图方式只给 EmulatorExtras，不留普通 adb 回落（用户 09-26 定：ModAVD 上普通 adb 截图约 250 ms，
 「不如不做」）；做不到就让连接失败、明确报错。
+
+MaaFramework 6.0.0-beta.1 起另有 ModAVDExtras（#1624）：载入 ``<根目录>\\extras\\modavd_extras.dll``
+（ModAVD 0.39.0 起整包自带），截图、触控、按键、文字都由这个库经模拟器控制台完成，客体里不用跑
+maatouch。它和 AVDExtras 挂在同一个 EmulatorExtras 位上，读 ``extras.modavd``；更早的 MaaFramework
+不认这个键，原样忽略。库在的时候两份都给，用哪份由 MFW 运行器借到运行环境、知道确切版本后再定。
 """
 
 from __future__ import annotations
@@ -43,14 +48,37 @@ from typing import Any
 #: AVDExtras 进 MaaFramework 的版本。
 AVD_EXTRAS_MIN_MAAFW_VERSION = (5, 7, 0)
 
+#: ModAVD 截图库在根目录下的位置；MaaFramework 按 ``extras.modavd.path`` 拼出同一路径。
+MODAVD_EXTRAS_LIBRARY = Path("extras") / "modavd_extras.dll"
+
+
+def modavd_extras_library(root: str | Path) -> Path:
+    """ModAVD 根目录下截图库的路径（不保证存在）。"""
+    return Path(root) / MODAVD_EXTRAS_LIBRARY
+
 
 def build_maafw_avd_config(
-    adb_path: str | Path, server_port: int, console_port: int
+    adb_path: str | Path,
+    server_port: int,
+    console_port: int,
+    *,
+    modavd_root: str | Path | None = None,
 ) -> dict[str, Any]:
-    """AdbController 的 ``config``：开 AVDExtras，推流开关改走私有 adb server。"""
+    """AdbController 的 ``config``：开 AVDExtras，推流开关改走私有 adb server。
+
+    ``modavd_root`` 给了 ModAVD 根目录、且截图库在时，再写一份 ``extras.modavd``
+    （根目录 + 控制台端口），交给 MaaFramework 6.0 起的 ModAVDExtras。
+    """
     adb = str(adb_path)
+    extras: dict[str, Any] = {"avd": {"enable": True}}
+    if modavd_root is not None and modavd_extras_library(modavd_root).is_file():
+        extras["modavd"] = {
+            "enable": True,
+            "path": str(Path(modavd_root)),
+            "console_port": int(console_port),
+        }
     return {
-        "extras": {"avd": {"enable": True}},
+        "extras": extras,
         "command": {
             "EmuWebrtcStart": [
                 adb,
@@ -94,7 +122,9 @@ def avd_extras_supported(version: str | None) -> bool | None:
 
 __all__ = [
     "AVD_EXTRAS_MIN_MAAFW_VERSION",
+    "MODAVD_EXTRAS_LIBRARY",
     "avd_extras_supported",
     "build_maafw_avd_config",
+    "modavd_extras_library",
     "parse_version",
 ]

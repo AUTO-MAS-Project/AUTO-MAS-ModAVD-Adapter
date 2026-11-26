@@ -487,7 +487,10 @@ class Control(EmulatorControl[ModAvdGame, ModAvdDevice]):
     async def maafw_adb_extra(self, uid: UUID) -> dict[str, object]:
         info = await self.adb_info(uid)
         return build_maafw_avd_config(
-            Path(info.adb_exe), info.adb_server_port, info.ports.console
+            Path(info.adb_exe),
+            info.adb_server_port,
+            info.ports.console,
+            modavd_root=self.installation_root(uid),
         )
 
     def supports_maafw_adb_extra_version(self, version: str | None) -> bool | None:
