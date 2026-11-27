@@ -12,7 +12,7 @@ from typing import Any, BinaryIO
 from uuid import UUID, uuid5
 
 from auto_mas_core import LockTicket, config_manager
-from auto_mas_core.adapters.game import TRIGGER_TICKET, DeviceSubscribeError
+from auto_mas_core.adapters.game import DeviceSubscribeError
 from auto_mas_core.devices import (
     DeviceInfo,
     DeviceRef,
@@ -179,7 +179,6 @@ class Control(EmulatorControl[ModAvdGame, ModAvdDevice]):
                 await self._retry_restore(device_uid)
             except Exception as error:
                 logger.warning(f"上次配置仍未恢复，保留备份并继续本轮任务：{error}")
-            await self._ensure(device_uid)
             if expect is not None:
                 if not device.session.backup:
                     device.session.backup = await self._backup(device_uid)
@@ -209,30 +208,11 @@ class Control(EmulatorControl[ModAvdGame, ModAvdDevice]):
         }
         await self._write_settings(uid, changes)
 
-    async def _ensure(self, uid: UUID) -> None:
-        backend = await self.backend()
-        device = self.device(uid)
-        if self.config.info.stable_mode:
-            await backend.apply_stable_mode(device.info.index)
-        if self.config.info.config_guard:
-            changes = self.config.info.baselines.get(str(uid), {})
-            if changes:
-                await self._write_settings(uid, changes)
-
-    async def apply_stable_mode(self, uid: UUID, *, ticket: LockTicket) -> list[str]:
-        self.check_subscription(uid, ticket)
-        async with self.operation_scope(self._operation):
-            backend = await self.backend()
-            return await backend.apply_stable_mode(self.device(uid).info.index)
-
     async def open(
         self, device_uid: UUID, package: str | None = None, *, ticket: LockTicket
     ) -> None:
         self.check_subscription(device_uid, ticket)
         async with self.operation_scope(self._operation):
-            # 任务订阅已按守卫基准备份，再写入本轮期望。开机不能覆盖该期望。
-            if ticket is TRIGGER_TICKET and self.device_usage(device_uid) is None:
-                await self._ensure(device_uid)
             backend = await self.backend()
             await self.open_backend(backend, device_uid, package, ticket=ticket)
             await self._refresh()
@@ -251,8 +231,6 @@ class Control(EmulatorControl[ModAvdGame, ModAvdDevice]):
         async with self.operation_scope(self._operation):
             backend = await self.backend()
             await backend.close(self.device(device_uid).info.index)
-            if ticket is TRIGGER_TICKET and self.device_usage(device_uid) is None:
-                await self._ensure(device_uid)
             await self._refresh()
 
     async def _visible(self, uid: UUID, ticket: LockTicket, visible: bool) -> None:
@@ -378,25 +356,7 @@ class Control(EmulatorControl[ModAvdGame, ModAvdDevice]):
         ticket: LockTicket,
     ) -> InstanceSettings:
         await self.write_settings(uid, changes, expected, ticket=ticket)
-        baselines = dict(self.config.info.baselines)
-        baselines[str(uid)] = {**baselines.get(str(uid), {}), **changes}
-        self.config.info.baselines = baselines
-        await self.config.commit()
         return await self.read_settings(uid)
-
-    async def capture_baseline(
-        self, uid: UUID, *, ticket: LockTicket
-    ) -> dict[str, int]:
-        self.check_subscription(uid, ticket)
-        settings = await self.read_settings(uid)
-        baseline = {
-            key: field.value
-            for key, field in settings.fields.items()
-            if field.state == "saved" and field.value is not None
-        }
-        self.config.info.baselines = {**self.config.info.baselines, str(uid): baseline}
-        await self.config.commit()
-        return baseline
 
     async def sweep_backups(self) -> None:
         for device in list(self.config.devices.values()):
