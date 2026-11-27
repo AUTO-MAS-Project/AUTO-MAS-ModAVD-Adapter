@@ -30,7 +30,7 @@
   ``modavd update prepare``（下载、核对、暂存，这时实例照样能开）和 ``modavd update install``（换上）。
   换上前再按 ``modavd list`` 和 MAS 正在开机的实例看一次，有就停在「已下载好」，下次直接换上。
   只有 ``install`` 运行期间算「正在更新」（:func:`update_in_progress`）：这时这个根目录不许开机、新建、
-  改设置、删除、装 APK、重启，查询不起 modavd，按换上前那次 ``list`` 给中性结果。
+  改设置、删除、装 APK，查询不起 modavd，按换上前那次 ``list`` 给中性结果。
 - **启动恢复**（:func:`startup`）：每个纳管的根目录跑一次 ``update status``，``phase`` 是 ``swapping``
   （上次换上被打断）时再跑 ``update recover``。
 

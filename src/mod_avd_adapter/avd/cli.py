@@ -49,8 +49,8 @@ from auto_mas_core.utils import get_logger
 
 logger = get_logger("ModAVD CLI")
 
-#: MAS 认得的 modavd 协议版本。2 是 ModAVDManager 0.3.0 去掉 ``restart`` 命令时升的；MAS 重启本来就是
-#: 先 stop 再 start，两个都能用。逐个列出而不写成「≥1」，以后再升还能认出不兼容。
+#: MAS 认得的 modavd 协议版本。2 是 ModAVDManager 0.3.0 去掉 ``restart`` 命令时升的；MAS 不用这条命令，
+#: 两个都能用。逐个列出而不写成「≥1」，以后再升还能认出不兼容。
 SUPPORTED_PROTOCOLS = (1, 2)
 CLI_EXE_RELATIVE_PATH = Path("tools") / "modavd.exe"
 DEFAULT_START_TIMEOUT_SECONDS = 300
@@ -62,7 +62,7 @@ COMMAND_TIMEOUT_SECONDS = 60
 BRIDGE_ROUND_BOOT_SECONDS = 300
 BRIDGE_ROUND_STOP_SECONDS = 28
 BRIDGE_ROUND_RESTART_SECONDS = 30
-#: 本进程里所有根目录的 start / create 至少错开这么多秒（重启是先 stop 再 start，跟着 start 错开）。0.36.0（modavd v0.1.0）开机后先把
+#: 本进程里所有根目录的 start / create 至少错开这么多秒。0.36.0（modavd v0.1.0）开机后先把
 #: 客体脚本写进用户级的 ``%TEMP%\\modavd-guest``，各根目录共用；几个 modavd 同时第一次写会撞上
 #: 「文件被占用」，那次开机少推一个脚本、只在 ``warnings`` 里留一句。错开开机，开机后的设置也就错开；
 #: 仍然撞上的由管理器在拉游戏前补跑一次 start。

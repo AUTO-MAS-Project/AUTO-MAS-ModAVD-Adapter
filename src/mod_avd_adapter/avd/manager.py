@@ -21,7 +21,7 @@
 """ModAVD 一条安装的设备管理器。
 
 对门面暴露的方法与雷电 / MuMu 两家后端相同（``open`` / ``close`` / ``getStatus`` /
-``getInfo`` / ``list_devices`` / 四项设置 / 稳定模式 / 新建删除实例）。开关机、状态、实例设置与
+``getInfo`` / ``list_devices`` / 四项设置 / 新建删除实例）。开关机、状态、实例设置与
 增删都交给根目录里的 ModAVD 命令行 ``tools\\modavd.exe``（:mod:`.cli`），怎么开机、怎么关机由
 modavd 决定。没有命令行的根目录不支持（:func:`build_manager` 直接报错）。MAS 在客体里发的命令
 （清后台、拉起应用、截图、看门狗探活）也走命令行（``modavd shell`` / ``modavd adb``）。
@@ -876,11 +876,6 @@ class _AvdCore(DeviceBase):
             fields={name: FieldValue(value(name), "saved") for name in names}
         )
 
-    async def read_instance_overview(
-        self, idx: str
-    ) -> tuple[InstanceSettings, bool, list[str]]:
-        return await self.read_instance_settings(idx), True, []
-
     async def write_instance_settings(
         self, idx: str, changes: dict, expected: dict | None = None
     ) -> dict[str, int]:
@@ -964,13 +959,6 @@ class _AvdCore(DeviceBase):
             result_values["dataPartitionGb"] = data_gb
         result_values.update(display)
         return result_values
-
-    async def read_stable_mode(self, idx: str) -> tuple[bool, list[str]]:
-        # ModAVD 没有会干扰截图识别的厂商功能，天然就是「稳定」的
-        return True, []
-
-    async def apply_stable_mode(self, idx: str) -> list[str]:
-        return []
 
     # ---- 实例增删 ------------------------------------------------------
 
@@ -1219,18 +1207,6 @@ class AvdManager(AppLaunchMixin, _AvdCore):
         # AppLaunchMixin 有意不把包名传给开机那一步；开机时要对照推荐内存记日志，所以在这里记下
         self._open_package = package_name or ""
         return await super().open(idx, package_name)
-
-    async def restart(self, idx: str, *, manual: bool = False) -> DeviceInfo:
-        """重启 = 先关机再开机（modavd 0.3.0 起没有 ``restart`` 命令）。
-
-        开机照 :meth:`open` 按这次的入口定有没有窗口；关机和开机之间不算运行中切换。看门狗、开机错开、
-        开机超时和取消的收尾都由 :meth:`close` / :meth:`open` 各自做。更新中在这里拦；新建中由
-        :meth:`close` 在关机之前拦（``modavd status``），免得关掉了再开不起来。"""
-        idx = str(idx)
-        if updater.update_in_progress(self.root):
-            raise RuntimeError("ModAVD 正在更新，更新完再重启")
-        await self.close(idx)
-        return await self.open(idx, manual=manual)
 
     async def launch_app(
         self,
